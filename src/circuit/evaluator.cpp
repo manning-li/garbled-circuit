@@ -9,6 +9,22 @@ namespace circuit{
 
 namespace {
 
+constexpr std::uint8_t kUnassigned = 2;
+
+void CheckGateInputs(const Gate& gate, const std::vector<std::uint8_t>& wires) {
+  for (std::size_t i = 0; i < gate.inputs.size(); ++i) {
+    if (gate.type == GateType::EQ && i == 0) {
+      continue;
+    }
+
+    std::size_t input = gate.inputs[i];
+    if (wires[input] == kUnassigned) {
+      throw std::runtime_error(
+          "Input wire not assigned: wires[" + std::to_string(i) + "].");
+    }
+  }
+}
+
 std::uint8_t EvaluateGate(const Gate& gate, 
                           const std::vector<std::uint8_t>& wires) {
   std::size_t input_wire1 = gate.inputs[0];
@@ -62,7 +78,7 @@ std::vector<std::uint8_t> EvaluateCircuit(
         "Invalid input size: " + std::to_string(inputs.size()) + ".");
   }
 
-  std::vector<std::uint8_t> wires(circuit.num_wires, 0);
+  std::vector<std::uint8_t> wires(circuit.num_wires, kUnassigned);
 
   for (std::size_t i = 0; i < inputs.size(); ++i) {
     if (inputs[i] > 1) {
@@ -72,6 +88,7 @@ std::vector<std::uint8_t> EvaluateCircuit(
   }
 
   for (const Gate& gate : circuit.gates) {
+    CheckGateInputs(gate, wires);
     wires[gate.output] = EvaluateGate(gate, wires);
   }
 

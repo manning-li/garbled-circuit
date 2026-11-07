@@ -8,7 +8,6 @@
 
 namespace circuit{
 
-// TODO: Use std::vector<bool>? 
 std::vector<std::uint8_t> EvaluateCircuit(
     const Circuit& circuit,
     const std::vector<std::uint8_t>& inputs);
