@@ -4,6 +4,10 @@ add_executable(garbled_circuits
     circuit/evaluator.cpp
     test/tester.cpp
     utils/file_utils.cpp
+    crypto/label.cpp
+    crypto/crypto_utils.cpp
+    garbling/yao/garbler.cpp
+    garbling/yao/evaluator.cpp
 )
 
 target_include_directories(garbled_circuits PRIVATE
@@ -18,4 +22,8 @@ target_compile_options(garbled_circuits PRIVATE
 
 target_compile_definitions(garbled_circuits PRIVATE
     PROJECT_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+
+target_link_libraries(garbled_circuits PRIVATE
+    OpenSSL::Crypto
 )

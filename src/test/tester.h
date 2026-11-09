@@ -5,8 +5,11 @@
 
 namespace test{
 
-void Run(const std::string& circuit_file,
-         const std::string& sample_file);
+void RunPlainCircuit(
+    const std::string& circuit_file, const std::string& sample_file);
+
+void RunBasicGC(
+    const std::string& circuit_file, const std::string& sample_file);
 
 }  // namespace test
 

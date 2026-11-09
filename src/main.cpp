@@ -10,7 +10,9 @@ int main(int argc, char* argv[]) {
   }
 
   try {
-    test::Run(argv[1], argv[2]);
+    // TODO:
+    // test::RunPlainCircuit(argv[1], argv[2]);
+    test::RunBasicGC(argv[1], argv[2]);
     return 0;
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << '\n';

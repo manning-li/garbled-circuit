@@ -1,0 +1,70 @@
+\documentclass[11pt, a4paper]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{cite}
+\usepackage{hyperref}
+\usepackage{geometry}
+
+\geometry{margin=2.5cm}
+
+\title{Encryption Scheme}
+\author{}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Yao's Garbled Circuits}
+
+\section{Fairplay} \cite{fairplay}
+
+\begin{enumerate}
+    \item Encryption:
+        \begin{enumerate}
+            \item Generate pseudo-random pads: 
+            $\text{SHA1}(w_i\parallel k\parallel x\parallel y)$ and 
+            $\text{SHA1}(w_j\parallel k\parallel x\parallel y)$, 
+            $w_i, w_j$ input wire labels, $k$ gate index, $x, y$ input bits. 
+            Each pad is a 160-bit hash value.
+            \item Apply XOR: $ciphertext=output\_label\oplus pad_i\oplus pad_j$.
+        \end{enumerate}
+    \item Decryption: $output\_label=ciphertext\oplus pad_i\oplus pad_j$.
+    \item Pros:
+        \begin{enumerate}
+            \item SHA-1 supports variable-length inputs (AES uses block ciphers).
+            \item Wire labels can be used to generate pads, without introducing
+            additional keys.
+            \item XOR is simple and efficient.
+        \end{enumerate}
+    \item Cons:
+        \begin{enumerate}
+            \item SHA-1 is outdated.
+            \item Existing weakness: when $w_i=w_j \rightarrow pad_i=pad_j$,
+            $pad_i\oplus pad_j=0$. \cite{duplicate_input_wires}
+            \item Uses SHA-1 as a pseudo-random function.
+        \end{enumerate}
+\end{enumerate}
+
+\section{Proof of Security} \cite{proof_of_security}
+
+\begin{enumerate}
+    \item Encryption:
+        \begin{enumerate}
+            \item Double encryption: 
+            $C_{x,y} = E_{k_1^x}\left(E_{k_2^y}(k_3^{g(x,y)})\right)$, $k_1^x, k_2^y$ input wire labels, $k_3^{g(x,y)}$ output label, $E$ symmetric encryption.
+            \item $E_k(x)=\langle r,\ f_k(r)\oplus x0^n\rangle$, $r$ random string (n-bits), $x$ plain text (n-bits).
+        \end{enumerate}
+    \item Note: requirements for secure encryption scheme: CPA security, secure 
+    for multiple messages, elusive range, efficiently verifiable range, and double-encryption.
+security.
+\end{enumerate}
+
+
+
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

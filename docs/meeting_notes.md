@@ -19,3 +19,13 @@
 #### Questions
 
 - Should use 'bit' to store a wire value? (currently uint_8.)
+
+#### Notes
+
+- Implement Yao's garbled circuit, including garbler and evaluator. The garbler 
+transfers cipertexts to evaluator using gc files and input files.
+- Correct the order of wire lists.
+
+
+### 11.09
+

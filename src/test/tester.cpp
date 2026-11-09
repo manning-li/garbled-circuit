@@ -12,11 +12,17 @@
 #include "circuit/parser.h"
 #include "circuit/evaluator.h"
 #include "config.h"
+#include "crypto/label.h"
+#include "garbling/yao/evaluator.h"
+#include "garbling/yao/garbler.h"
 #include "utils/file_utils.h"
 
 namespace test{
 
 namespace {
+
+constexpr char kGarbledCircuitFile[] = "garbled_circuit.bin";
+constexpr char kInputLabelsFile[] = "input_labels.bin";
 
 std::vector<std::string> ParseFields(std::istringstream& line) {
   std::vector<std::string> fields;
@@ -85,7 +91,8 @@ std::string BitsToHex(const std::vector<uint8_t>& bits) {
 
 }  // namespace
 
-void Run(const std::string& circuit_file, const std::string& sample_file) {
+void RunPlainCircuit(
+    const std::string& circuit_file, const std::string& sample_file) {
 
   std::ifstream file(sample_file);
   if (!file.is_open()) {
@@ -140,6 +147,92 @@ void Run(const std::string& circuit_file, const std::string& sample_file) {
     } else {
       ++failed;
       std::cout << "[FAIL] Line: " << line_number << "\n";
+    }
+  }
+
+  std::cout << "Results: \n";
+  std::cout << "Total cases: " << line_number - 1 << "\n";
+  std::cout << "Passed: " << passed << "\n";
+  std::cout << "Failed: " << failed << "\n";
+}
+
+void RunBasicGC(
+    const std::string& circuit_file, const std::string& sample_file) {
+
+  std::ifstream file(sample_file);
+  if (!file.is_open()) {
+    throw std::runtime_error("Failed to open sample file: " + sample_file);
+  }
+
+  const circuit::Circuit circuit = circuit::ParseCircuit(circuit_file);
+
+  if (circuit.input_sizes.size() != 2) {
+    if (kDebug) {
+      std::cout << "Input parties: " << circuit.input_sizes.size() << "\n";
+    }
+    throw std::runtime_error("Only supports 2 parties.");
+  }
+
+  basic_gc::Garbler garbler;
+  garbler.GarbleCircuit(circuit);
+  garbler.SaveGarbledCircuit(kGarbledCircuitFile);
+
+  basic_gc::Evaluator evaluator;
+  evaluator.LoadGarbledCircuit(kGarbledCircuitFile);
+
+  std::istringstream line;
+  std::size_t line_number = 0;
+  std::size_t passed = 0;
+  std::size_t failed = 0;
+
+  std::cout << "Test starts: " << circuit_file << "\n";
+
+  while (utils::GetNextLine(file, line)) {
+    ++line_number;
+    if (line_number == 1) {  // Skip header.
+      continue;
+    }
+
+    const std::vector<std::string> fields = ParseFields(line);
+    std::size_t num_input_parties = circuit.input_sizes.size();
+
+    if (fields.size() != num_input_parties + 1) {
+      throw std::runtime_error(
+          "Invalid fields, line " + std::to_string(line_number));
+    }
+
+    // Assume that gatbler represents input party 1 
+    // and evaluator represents input party 2.
+    std::vector<std::uint8_t> g_inputs =
+        HexToBits(fields[0], circuit.input_sizes[0]);
+    std::vector<std::uint8_t> e_inputs =
+        HexToBits(fields[1], circuit.input_sizes[1]);
+    auto g_input_labels = garbler.GetInputLabels(g_inputs, 0);
+    // TODO: Use OT instead.
+    auto e_input_labels = garbler.GetInputLabels(e_inputs, 1);
+
+    garbler.SaveInputLabels(g_input_labels, 0, kInputLabelsFile);
+    evaluator.LoadInputLabels(kInputLabelsFile);
+
+    const std::vector<crypto::Label> output_labels =
+        evaluator.Evaluate(e_input_labels);
+    // TODO: Use ??? instead.
+    const std::vector<std::uint8_t> output =
+        garbler.DecodeOutputLabels(output_labels);
+    
+    const std::vector<uint8_t> expected_output =
+        HexToBits(fields.back(), circuit.GetNumOutputs());
+
+    if (output == expected_output) {
+      ++passed;
+    } else {
+      ++failed;
+      std::cout << "[FAIL] Line: " << line_number << "\n";
+    }
+
+    if (kDebug) {
+      std::cout << "Line [" << line_number << "], expected_output: "
+                << fields.back() << ", output: " << BitsToHex(output) << "\n";
     }
   }
 
