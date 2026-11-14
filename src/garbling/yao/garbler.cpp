@@ -9,6 +9,7 @@
 
 #include "circuit/evaluator.h"
 #include "crypto/crypto_utils.h"
+#include "crypto/label.h"
 #include "utils/file_utils.h"
 
 namespace basic_gc {
@@ -41,10 +42,10 @@ void Garbler::GarbleCircuit(const circuit::Circuit& circuit) {
     const std::size_t num_rows = 
         gate.type == circuit::GateType::EQ ? 0 : (1U << num_inputs);  // 2^n
 
-    // TODO: Handle EQ gate.
+    // TODO: Support EQ gate.
     for (std::size_t row_index = 0; row_index < num_rows; ++row_index) {
       std::vector<std::uint8_t> input_values;
-      std::vector<crypto::Label> input_labels;
+      std::vector<Label> input_labels;
 
       for (std::size_t i = 0; i < num_inputs; ++i) {
         const std::uint8_t bit =
@@ -52,36 +53,26 @@ void Garbler::GarbleCircuit(const circuit::Circuit& circuit) {
 
         input_values.push_back(bit);
         const std::size_t wire = garbled_gate.inputs[i];
-        const crypto::WireLabels& labels = wire_labels_[wire];
+        const WireLabels& labels = wire_labels_[wire];
         input_labels.push_back(bit == 0 ? labels.zero : labels.one);
       }
 
       const std::uint8_t output_value = 
           circuit::EvaluateGate(gate, input_values);
-      const crypto::Label& output_label = 
+      const Label& output_label = 
           output_value == 0
               ? wire_labels_[gate.output].zero
               : wire_labels_[gate.output].one;
 
       const auto key = crypto::DeriveKey(input_labels);
       const auto encrypted = crypto::Encrypt(key, output_label);
-
-      GarbledRow row;
-      std::copy(
-          encrypted.begin(),
-          encrypted.begin() + crypto::kBlockSize,
-          row.ciphertext.begin());
-      std::copy(
-          encrypted.begin() + crypto::kBlockSize,
-          encrypted.end(),
-          row.check.begin());
-      garbled_gate.ciphertexts.push_back(row);
+      garbled_gate.ciphertexts.push_back(encrypted);
     }
     garbled_circuit_.gates.push_back(std::move(garbled_gate));
   }
 }
 
-std::vector<crypto::Label> Garbler::GetInputLabels(
+std::vector<Label> Garbler::GetInputLabels(
     const std::vector<std::uint8_t>& inputs,
     std::size_t party_id) const {
   
@@ -97,12 +88,12 @@ std::vector<crypto::Label> Garbler::GetInputLabels(
     wire_index += garbled_circuit_.input_sizes[i];
   }
 
-  std::vector<crypto::Label> labels;
+  std::vector<Label> labels;
   for (std::size_t i = 0; i < inputs.size(); ++i) {
     if (inputs[i] > 1) {
       throw std::runtime_error("Invalid input value.");
     }
-    const crypto::WireLabels& wire_labels = wire_labels_[wire_index + i];
+    const WireLabels& wire_labels = wire_labels_[wire_index + i];
     labels.push_back(inputs[i] == 0 ? wire_labels.zero
                                     : wire_labels.one);
   }
@@ -136,14 +127,8 @@ void Garbler::SaveGarbledCircuit(const std::string& filename) const {
     }
     utils::WriteUint64(file, gate.output);
     utils::WriteSize32(file, gate.ciphertexts.size());
-
-    for (const GarbledRow& row : gate.ciphertexts) {
-      file.write(
-          reinterpret_cast<const char*>(row.ciphertext.data()),
-          row.ciphertext.size());
-      file.write(
-          reinterpret_cast<const char*>(row.check.data()),
-          row.check.size());
+    for (const Ciphertext& text : gate.ciphertexts) {
+      file.write(reinterpret_cast<const char*>(text.data()), text.size());
     }
   }
 
@@ -153,8 +138,7 @@ void Garbler::SaveGarbledCircuit(const std::string& filename) const {
 }
 
 void Garbler::SaveInputLabels(
-    const std::vector<crypto::Label>& labels,
-    std::size_t party_id,
+    const std::vector<Label>& labels, std::size_t party_id,
     const std::string& filename) const {
   
   std::ofstream file(filename, std::ios::binary);
@@ -168,7 +152,8 @@ void Garbler::SaveInputLabels(
   utils::WriteUint64(file, labels.size());
 
   for (std::size_t i = 0; i < labels.size(); ++i) {
-    file.write(reinterpret_cast<const char*>(labels[i].data()), labels[i].size());
+    file.write(
+        reinterpret_cast<const char*>(labels[i].data()), labels[i].size());
   }
 
   if (!file) {
@@ -176,10 +161,9 @@ void Garbler::SaveInputLabels(
   }
 }
 
-// TODO: Remove this function.
 std::vector<std::uint8_t> Garbler::DecodeOutputLabels(
-    const std::vector<crypto::Label>& output_labels) const {
-  
+    const std::vector<Label>& output_labels) const {
+
   std::vector<std::uint8_t> outputs;
 
   const std::size_t num_outputs = garbled_circuit_.GetNumOutputs();

@@ -12,8 +12,7 @@ namespace crypto {
 
 constexpr char kInfo[] = "gc";
 
-std::array<std::uint8_t, kAesKeySize> DeriveKey(
-    const std::vector<Label>& input_labels) {
+AesKey DeriveKey(const std::vector<Label>& input_labels) {
   std::vector<std::uint8_t> material;
 
   for (const Label& label : input_labels) {
@@ -58,14 +57,11 @@ std::array<std::uint8_t, kAesKeySize> DeriveKey(
   return key;
 }
 
-std::array<std::uint8_t, kPlaintextSize> Encrypt(
-    const std::array<std::uint8_t, kAesKeySize>& key,
-    const crypto::Label& output_label) {
-  
-  std::array<std::uint8_t, kPlaintextSize> plaintext{};  // Init with 0.
+Ciphertext Encrypt(const AesKey& key, const Label& output_label) {
+  Plaintext plaintext{};  // Init with 0.
   std::copy(output_label.begin(), output_label.end(), plaintext.begin());
 
-  std::array<std::uint8_t, kPlaintextSize> ciphertext{};
+  Ciphertext ciphertext{};
 
   std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> context(
       EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
@@ -91,11 +87,9 @@ std::array<std::uint8_t, kPlaintextSize> Encrypt(
   return ciphertext;
 }
 
-std::array<std::uint8_t, kPlaintextSize> Decrypt(
-    const std::array<std::uint8_t, kAesKeySize>& key,
-    const std::array<std::uint8_t, kPlaintextSize>& ciphertext) {
+Plaintext Decrypt(const AesKey& key, const Ciphertext& ciphertext) {
   
-  std::array<std::uint8_t, kPlaintextSize> plaintext{};
+  Plaintext plaintext{};
 
   std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> context(
       EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);

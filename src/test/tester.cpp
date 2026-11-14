@@ -15,6 +15,7 @@
 #include "crypto/label.h"
 #include "garbling/yao/evaluator.h"
 #include "garbling/yao/garbler.h"
+#include "type.h"
 #include "utils/file_utils.h"
 
 namespace test{
@@ -208,15 +209,16 @@ void RunBasicGC(
     std::vector<std::uint8_t> e_inputs =
         HexToBits(fields[1], circuit.input_sizes[1]);
     auto g_input_labels = garbler.GetInputLabels(g_inputs, 0);
-    // TODO: Use OT instead.
+    // TODO(low priority): Use OT instead.
     auto e_input_labels = garbler.GetInputLabels(e_inputs, 1);
 
     garbler.SaveInputLabels(g_input_labels, 0, kInputLabelsFile);
+
+    evaluator.ResetInputLabels();
     evaluator.LoadInputLabels(kInputLabelsFile);
 
-    const std::vector<crypto::Label> output_labels =
-        evaluator.Evaluate(e_input_labels);
-    // TODO: Use ??? instead.
+    const std::vector<Label> output_labels = evaluator.Evaluate(e_input_labels);
+    // TODO(low priority): Use ??? instead.
     const std::vector<std::uint8_t> output =
         garbler.DecodeOutputLabels(output_labels);
     

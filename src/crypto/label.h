@@ -5,15 +5,9 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "type.h"
+
 namespace crypto {
-
-constexpr std::size_t kLabelSize = 16;
-using Label = std::array<std::uint8_t, kLabelSize>;
-
-struct WireLabels {
-  Label zero;
-  Label one;
-};
 
 Label GenerateLabel();
 WireLabels GenerateWireLabels();

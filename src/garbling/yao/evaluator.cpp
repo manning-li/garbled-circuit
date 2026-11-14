@@ -17,31 +17,23 @@ namespace basic_gc {
 
 namespace{
 
-bool CheckText(const std::array<std::uint8_t, crypto::kPlaintextSize>& text) {
-  for (std::size_t i = crypto::kLabelSize; i < text.size(); ++i) {
+bool IsValidText(const Plaintext& text) {
+  for (std::size_t i = kLabelSize; i < text.size(); ++i) {
     if (text[i] != 0) {
       return false;
     }
   }
   return true;
 }
-
-std::array<std::uint8_t, crypto::kPlaintextSize> RowToText(const GarbledRow& row) {
-  std::array<std::uint8_t, crypto::kPlaintextSize> ciphertext{};
-  std::copy(row.ciphertext.begin(), row.ciphertext.end(), ciphertext.begin());
-  std::copy(
-      row.check.begin(), row.check.end(),
-      ciphertext.begin() + crypto::kBlockSize);
-  return ciphertext;
-}
       
 } // namespace
 
 
-std::vector<crypto::Label> Evaluator::Evaluate(
-    const std::vector<crypto::Label>& e_input_labels) const {
-
-  // TODO: Make sure g_input_labels_ and garbled_circuit_ are loaded.
+std::vector<Label> Evaluator::Evaluate(
+    const std::vector<Label>& e_input_labels) const {
+  if (!garbled_circuit_loaded_ || !input_labels_loaded_) {
+    throw std::runtime_error("Binary files not loaded.");
+  }
 
   const std::size_t e_party_id = 1 - g_party_id_;
 
@@ -50,7 +42,7 @@ std::vector<crypto::Label> Evaluator::Evaluate(
     throw std::runtime_error("Invalid input labels.");
   }
 
-  std::vector<std::optional<crypto::Label>> wires(garbled_circuit_.num_wires);
+  std::vector<std::optional<Label>> wires(garbled_circuit_.num_wires);
 
   std::size_t g_wire_index = 0;
   for (std::size_t i = 0; i < g_party_id_; ++i) {
@@ -69,7 +61,7 @@ std::vector<crypto::Label> Evaluator::Evaluate(
   }
 
   for (const auto& gate : garbled_circuit_.gates) {
-    std::vector<crypto::Label> input_labels;
+    std::vector<Label> input_labels;
     for (std::size_t input : gate.inputs) {
       if (!wires[input].has_value()) {
         throw std::runtime_error(
@@ -80,12 +72,12 @@ std::vector<crypto::Label> Evaluator::Evaluate(
 
     const auto key = crypto::DeriveKey(input_labels);
     bool has_valid_text = false;
-    crypto::Label output_label{};
-    for (const GarbledRow& row : gate.ciphertexts) {
-      const auto plaintext = crypto::Decrypt(key, RowToText(row));
-      if (CheckText(plaintext)) {
+    Label output_label{};
+    for (const Ciphertext& text : gate.ciphertexts) {
+      const auto decrypted = crypto::Decrypt(key, text);
+      if (IsValidText(decrypted)) {
         std::copy(
-            plaintext.begin(), plaintext.begin() + crypto::kLabelSize,
+            decrypted.begin(), decrypted.begin() + kLabelSize,
             output_label.begin());
         has_valid_text = true;
       }
@@ -100,7 +92,7 @@ std::vector<crypto::Label> Evaluator::Evaluate(
   const std::size_t num_outputs = garbled_circuit_.GetNumOutputs();
   const std::size_t num_wires = garbled_circuit_.num_wires;
 
-  std::vector<crypto::Label> output_labels;
+  std::vector<Label> output_labels;
   for (std::size_t i = (num_wires - num_outputs); i < num_wires; ++i) {
     if (!wires[i].has_value()) {
       throw std::runtime_error(
@@ -113,6 +105,10 @@ std::vector<crypto::Label> Evaluator::Evaluate(
 }
 
 void Evaluator::LoadGarbledCircuit(const std::string& filename) {
+  if (garbled_circuit_loaded_) {
+    throw std::runtime_error("File garbled_circuit.bin already loaded.");
+  }
+
   std::ifstream file(filename, std::ios::binary);
   if (!file.is_open()) {
     throw std::runtime_error("Failed to open garbled_circuit.bin.");
@@ -163,11 +159,8 @@ void Evaluator::LoadGarbledCircuit(const std::string& filename) {
 
     const std::size_t num_rows = utils::ReadSize32(file);
     gate.ciphertexts.resize(num_rows);
-    for (GarbledRow& row : gate.ciphertexts) {
-      file.read(
-          reinterpret_cast<char*>(row.ciphertext.data()),
-          row.ciphertext.size());
-      file.read(reinterpret_cast<char*>(row.check.data()), row.check.size());
+    for (Ciphertext& text : gate.ciphertexts) {
+      file.read(reinterpret_cast<char*>(text.data()), text.size());
       if (!file) {
         throw std::runtime_error("Failed to read garbled row.");
       }
@@ -176,11 +169,16 @@ void Evaluator::LoadGarbledCircuit(const std::string& filename) {
     circuit.gates.push_back(std::move(gate));
   }
   garbled_circuit_ = std::move(circuit);
+  garbled_circuit_loaded_ = true;
 }
 
 void Evaluator::LoadInputLabels(const std::string& filename) {
-
-  // TODO: Make sure garbled_circuit_ is loaded.
+  if (input_labels_loaded_) {
+    throw std::runtime_error("File input_labels.bin already loaded.");
+  }
+  if (!garbled_circuit_loaded_) {
+    throw std::runtime_error("File garbled_circuit.bin not loaded.");
+  }
 
   std::ifstream file(filename, std::ios::binary);
   if (!file.is_open()) {
@@ -209,10 +207,10 @@ void Evaluator::LoadInputLabels(const std::string& filename) {
     throw std::runtime_error("Invalid input labels number.");
   }
 
-  std::vector<crypto::Label> labels;
+  std::vector<Label> labels;
   labels.reserve(num_labels);
   for (std::size_t i = 0; i < num_labels; ++i) {
-    crypto::Label label{};
+    Label label{};
     file.read(reinterpret_cast<char*>(label.data()), label.size());
     if (!file) {
       throw std::runtime_error("Failed to read input label.");
@@ -220,6 +218,17 @@ void Evaluator::LoadInputLabels(const std::string& filename) {
     labels.push_back(label);
   }
   g_input_labels_ = std::move(labels);
+  input_labels_loaded_ = true;
+}
+
+void Evaluator::ResetGarbledCircuit() {
+  garbled_circuit_ = GarbledCircuit{};
+  garbled_circuit_loaded_ = false;
+}
+
+void Evaluator::ResetInputLabels() {
+  g_input_labels_ = {};
+  input_labels_loaded_ = false;
 }
 
 }

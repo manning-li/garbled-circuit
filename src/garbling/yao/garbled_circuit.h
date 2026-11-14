@@ -9,19 +9,15 @@
 #include <vector>
 
 #include "crypto/label.h"
+#include "type.h"
 
 namespace basic_gc {
-
-struct GarbledRow {
-  std::array<std::uint8_t, crypto::kLabelSize> ciphertext;
-  std::array<std::uint8_t, 16> check;
-};
 
 struct GarbledGate {
   std::vector<std::size_t> inputs;  // Input wire indices, except for
                                     // EQ gate: inputs[0] is constant value.
   std::size_t output;
-  std::vector<GarbledRow> ciphertexts;
+  std::vector<Ciphertext> ciphertexts;
 };
 
 struct GarbledCircuit {
