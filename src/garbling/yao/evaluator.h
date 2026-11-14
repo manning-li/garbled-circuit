@@ -14,23 +14,19 @@ namespace basic_gc {
 class Evaluator {
  public:
   std::vector<Label> Evaluate(
-      const std::vector<Label>& evaluator_input_labels) const;
+      const std::vector<Label>& g_input_labels,
+      const std::vector<Label>& e_input_labels,
+      std::size_t g_party_id, std::size_t e_party_id) const;
 
   void LoadGarbledCircuit(const std::string& filename);
-  void LoadInputLabels(const std::string& filename);
+  std::vector<Label> LoadInputLabels(const std::string& filename);
 
   void ResetGarbledCircuit();
   void ResetInputLabels();
 
  private:
   GarbledCircuit garbled_circuit_;
-
-  // Garbler inputs.
-  std::vector<Label> g_input_labels_;
-  std::size_t g_party_id_ = 0;
-
   bool garbled_circuit_loaded_ = false;
-  bool input_labels_loaded_ = false;
 };
 
 }  // namespace basic_gc

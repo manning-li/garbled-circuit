@@ -8,6 +8,9 @@ add_executable(garbled_circuits
     crypto/crypto_utils.cpp
     garbling/yao/garbler.cpp
     garbling/yao/evaluator.cpp
+    test/rpc_client.cpp
+    test/rpc_server.cpp
+    utils/rpc_utils.cpp
 )
 
 target_include_directories(garbled_circuits PRIVATE

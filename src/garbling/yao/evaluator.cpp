@@ -30,14 +30,14 @@ bool IsValidText(const Plaintext& text) {
 
 
 std::vector<Label> Evaluator::Evaluate(
-    const std::vector<Label>& e_input_labels) const {
-  if (!garbled_circuit_loaded_ || !input_labels_loaded_) {
-    throw std::runtime_error("Binary files not loaded.");
+    const std::vector<Label>& g_input_labels,
+    const std::vector<Label>& e_input_labels,
+    std::size_t g_party_id, std::size_t e_party_id) const {
+  if (!garbled_circuit_loaded_) {
+    throw std::runtime_error("File garbled_circuit.bin not loaded.");
   }
 
-  const std::size_t e_party_id = 1 - g_party_id_;
-
-  if (g_input_labels_.size() != garbled_circuit_.input_sizes[g_party_id_] ||
+  if (g_input_labels.size() != garbled_circuit_.input_sizes[g_party_id] ||
       e_input_labels.size() != garbled_circuit_.input_sizes[e_party_id]) {
     throw std::runtime_error("Invalid input labels.");
   }
@@ -45,11 +45,11 @@ std::vector<Label> Evaluator::Evaluate(
   std::vector<std::optional<Label>> wires(garbled_circuit_.num_wires);
 
   std::size_t g_wire_index = 0;
-  for (std::size_t i = 0; i < g_party_id_; ++i) {
+  for (std::size_t i = 0; i < g_party_id; ++i) {
     g_wire_index += garbled_circuit_.input_sizes[i];
   }
-  for (std::size_t i = 0; i < g_input_labels_.size(); ++i) {
-    wires[g_wire_index + i] = g_input_labels_[i];
+  for (std::size_t i = 0; i < g_input_labels.size(); ++i) {
+    wires[g_wire_index + i] = g_input_labels[i];
   }
 
   std::size_t e_wire_index = 0;
@@ -172,10 +172,7 @@ void Evaluator::LoadGarbledCircuit(const std::string& filename) {
   garbled_circuit_loaded_ = true;
 }
 
-void Evaluator::LoadInputLabels(const std::string& filename) {
-  if (input_labels_loaded_) {
-    throw std::runtime_error("File input_labels.bin already loaded.");
-  }
+std::vector<Label> Evaluator::LoadInputLabels(const std::string& filename) {
   if (!garbled_circuit_loaded_) {
     throw std::runtime_error("File garbled_circuit.bin not loaded.");
   }
@@ -196,14 +193,14 @@ void Evaluator::LoadInputLabels(const std::string& filename) {
     throw std::runtime_error("Invalid version.");
   }
 
-  g_party_id_ = utils::ReadUint32(file);
-  if (g_party_id_ >= garbled_circuit_.input_sizes.size()) {
+  std::size_t party_id = utils::ReadUint32(file);
+  if (party_id >= garbled_circuit_.input_sizes.size()) {
     throw std::runtime_error("Invalid party ID.");
   }
 
   const std::size_t num_labels =
       static_cast<std::size_t>(utils::ReadUint64(file));
-  if (num_labels != garbled_circuit_.input_sizes[g_party_id_]) {
+  if (num_labels != garbled_circuit_.input_sizes[party_id]) {
     throw std::runtime_error("Invalid input labels number.");
   }
 
@@ -217,18 +214,12 @@ void Evaluator::LoadInputLabels(const std::string& filename) {
     }
     labels.push_back(label);
   }
-  g_input_labels_ = std::move(labels);
-  input_labels_loaded_ = true;
+  return labels;
 }
 
 void Evaluator::ResetGarbledCircuit() {
   garbled_circuit_ = GarbledCircuit{};
   garbled_circuit_loaded_ = false;
-}
-
-void Evaluator::ResetInputLabels() {
-  g_input_labels_ = {};
-  input_labels_loaded_ = false;
 }
 
 }
